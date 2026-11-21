@@ -338,10 +338,19 @@
       .recent {
         display: flex;
         gap: 10px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         min-height: 64px;
+        /* never wider than its box; room for the outline of the newest chip */
+        min-width: 0;
+        overflow: hidden;
+        padding: 6px;
+        margin: -6px;
+      }
+      .side {
+        min-width: 0;
       }
       .chip {
+        flex-shrink: 0;
         width: 64px;
         height: 64px;
         border-radius: 50%;
@@ -676,8 +685,10 @@
         margin-bottom: 14px;
       }
       html.tv .recent {
-        gap: 18px;
-        min-height: 104px;
+        padding: 10px;
+        margin: -10px;
+        gap: 14px;
+        min-height: 90px;
         flex-wrap: nowrap;
         align-items: center;
       }
@@ -685,9 +696,9 @@
         font-size: 26px;
       }
       html.tv .chip {
-        width: 104px;
-        height: 104px;
-        font-size: 44px;
+        width: 90px;
+        height: 90px;
+        font-size: 40px;
       }
       html.tv .chip small {
         font-size: 18px;
@@ -933,7 +944,11 @@
           );
         }
         fitTv();
-        addEventListener("resize", fitTv);
+        addEventListener("resize", () => {
+          fitTv();
+          // re-fit the latest numbers to the new width
+          if ($("#game").style.display === "block") render(false);
+        });
         // ---------- keep the screen awake ----------
         // Stops the TV (or laptop) from dimming, starting a screen saver or
         // going to sleep while a game is on. Uses the Wake Lock API where the
@@ -1210,8 +1225,9 @@
           }
           const rec = $("#recent");
           rec.innerHTML = "";
+          // as many latest numbers as fit the width, newest first
           S.called
-            .slice(-6)
+            .slice(-40)
             .reverse()
             .forEach((n) => {
               const d = document.createElement("div");
@@ -1221,6 +1237,10 @@
                 (letterOf(n) ? `<small>${letterOf(n)}</small>` : "") + n;
               rec.appendChild(d);
             });
+          const edge = rec.getBoundingClientRect().right + 0.5;
+          [...rec.children].forEach((c) => {
+            if (c.getBoundingClientRect().right > edge) c.remove();
+          });
           if (!last)
             rec.innerHTML =
               '<span class="muted">Nothing yet – press “Next number”.</span>';
