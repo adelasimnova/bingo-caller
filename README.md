@@ -8,6 +8,7 @@ A bingo number caller that runs in the browser. It is one HTML file with no buil
 
 - **Two game modes:** 1–75 (5×5 cards with columns B I N G O) or 1–90 (tombola, 3 rows × 9)
 - **Voice calling** reads numbers aloud with the browser's speech synthesis, including classic bingo calls in the 1–90 mode (for example "Two fat ladies, eighty-eight!")
+- **Background music:** five original lounge tracks generated live in the browser. Each new game plays the next track, the music gets quieter while the voice speaks, and **🎵 Music** turns it on or off
 - **Auto draw** at fast, normal or slow speed, or draw numbers one at a time with **Next number**
 - **Board of called numbers** with colour-coded columns, plus a list of the latest numbers
 - **Card check:** use **Check card** to verify a player's numbers when someone calls LINE or BINGO

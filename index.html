@@ -594,6 +594,7 @@
           <h1>Bingo 🎱</h1>
           <span class="pill" id="count">0 / 75</span>
           <button class="tb" id="voiceToggle">🔊 Voice</button>
+          <button class="tb" id="musicBtn">🎵 Music</button>
           <button class="tb" id="fsBtn">⛶ Fullscreen</button>
           <button class="tb" id="newBtn">↺ New game</button>
         </div>
@@ -827,6 +828,8 @@
           S.pool = all.filter((n) => !S.called.includes(n));
           voiceOn = S.voice > 0;
           updateVoiceBtn();
+          music.newGame();
+          updateMusicBtn();
           $("#setup").style.display = "none";
           $("#game").style.display = "block";
           buildBoard();
@@ -1032,6 +1035,399 @@
             o.stop(ctx.currentTime + dur);
           } catch (e) {}
         }
+        // ---------- background music (generated live, 5 lounge tracks) ----------
+        const midi = (name) => {
+          const m = /^([A-G])(b|#)?(-?\d)$/.exec(name);
+          const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]];
+          return (
+            pc + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12 * (+m[3] + 1)
+          );
+        };
+        const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+        // chord = "Bass | voicing notes"
+        const ch = (s) => {
+          const [b, v] = s.split("|").map((x) => x.trim().split(/\s+/));
+          const bass = midi(b[0]),
+            notes = v.map(midi);
+          return {
+            bass,
+            notes,
+            pcs: [...new Set([bass, ...notes].map((n) => n % 12))],
+          };
+        };
+        const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+        const TRACKS = [
+          {
+            name: "Lobby Lounge",
+            bpm: 88,
+            steps: 16,
+            swing: 0,
+            key: 0,
+            comp: "epiano",
+            compSteps: [0, 3, 6, 10, 12],
+            bass: "bossa",
+            hats: [0, 2, 4, 6, 8, 10, 12, 14],
+            lead: "vibes",
+            leadProb: 0.32,
+            chords: [
+              "C3 | E4 G4 B4 D5",
+              "A2 | C4 E4 G4 B4",
+              "D3 | F4 A4 C5 E5",
+              "G2 | F4 A4 B4 E5",
+            ],
+          },
+          {
+            name: "Third Floor",
+            bpm: 104,
+            steps: 16,
+            swing: 0.62,
+            key: 0,
+            comp: "vibes",
+            compSteps: [0, 10],
+            bass: "walk",
+            hats: [4, 12],
+            lead: "flute",
+            leadProb: 0.28,
+            chords: [
+              "F2 | E4 A4 C5",
+              "E2 | D4 G4 B4",
+              "D2 | C4 F4 A4",
+              "G2 | B3 F4 A4",
+              "E2 | D4 G4 B4",
+              "A2 | C#4 G4 B4",
+              "D2 | C4 F4 A4",
+              "G2 | B3 E4 F4",
+            ],
+          },
+          {
+            name: "Velvet Waiting Room",
+            bpm: 66,
+            steps: 16,
+            swing: 0,
+            key: 1,
+            comp: "pad",
+            compSteps: [0],
+            bass: "long",
+            hats: [],
+            lead: "epiano",
+            leadProb: 0.22,
+            chords: [
+              "Db3 | F4 Ab4 C5 Eb5",
+              "Bb2 | Db4 F4 Ab4 C5",
+              "Eb3 | Gb4 Bb4 Db5 F5",
+              "Ab2 | Gb4 C5 F5 Bb5",
+            ],
+          },
+          {
+            name: "Hold, Please",
+            bpm: 112,
+            steps: 16,
+            swing: 0.58,
+            key: 7,
+            comp: "epiano",
+            compSteps: [4, 12],
+            bass: "two",
+            hats: [0, 4, 6, 8, 12, 14],
+            lead: "vibes",
+            leadProb: 0.34,
+            chords: [
+              "G2 | F#4 A4 B4 D5",
+              "E2 | D4 G4 B4",
+              "A2 | C4 E4 G4 B4",
+              "D3 | C4 F#4 A4 B4",
+            ],
+          },
+          {
+            name: "Mall Waltz",
+            bpm: 132,
+            steps: 12,
+            swing: 0,
+            key: 3,
+            comp: "vibes",
+            compSteps: [4, 8],
+            bass: "waltz",
+            hats: [],
+            lead: "flute",
+            leadProb: 0.3,
+            chords: [
+              "Eb3 | G4 Bb4 D5",
+              "C3 | Eb4 G4 Bb4",
+              "F2 | Ab4 C5 Eb5",
+              "Bb2 | Ab4 D5 F5",
+              "G2 | F4 Bb4 D5",
+              "C3 | E4 Bb4 D5",
+              "F2 | Ab4 C5 Eb5",
+              "Bb2 | Ab4 D5 G5",
+            ],
+          },
+        ].map((t) => ({ ...t, chords: t.chords.map(ch) }));
+
+        const music = (() => {
+          let bus = null,
+            fx = null,
+            timer = null,
+            track = null,
+            step = 0,
+            bar = 0,
+            next = 0,
+            lead = 72,
+            leadUntil = 0,
+            duck = 0,
+            noise = null;
+          let on = true,
+            current = -1;
+          try {
+            on = localStorage.getItem("bingoMusic") !== "off";
+          } catch (e) {}
+          const LEVEL = 0.2; // soft background level
+
+          function env(g, t, a, peak, d) {
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime(peak, t + a);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+          }
+          function osc(type, f, t, stop, dest, detune) {
+            const o = ctx.createOscillator();
+            o.type = type;
+            o.frequency.value = f;
+            if (detune) o.detune.value = detune;
+            o.connect(dest);
+            o.start(t);
+            o.stop(stop);
+            return o;
+          }
+          function voice(inst, m, t, d, v) {
+            const f = hz(m),
+              g = ctx.createGain(),
+              lp = ctx.createBiquadFilter();
+            lp.type = "lowpass";
+            g.connect(lp);
+            lp.connect(fx);
+            if (inst === "epiano") {
+              lp.frequency.value = 2200;
+              env(g, t, 0.006, 0.09 * v, d + 0.9);
+              osc("sine", f, t, t + d + 1, g);
+              const g2 = ctx.createGain();
+              g2.connect(g);
+              env(g2, t, 0.003, 0.35, 0.25);
+              osc("triangle", f * 2, t, t + 0.4, g2);
+            } else if (inst === "vibes") {
+              lp.frequency.value = 3000;
+              env(g, t, 0.004, 0.08 * v, d + 1.4);
+              osc("sine", f, t, t + d + 1.5, g);
+              const g2 = ctx.createGain();
+              g2.connect(g);
+              env(g2, t, 0.002, 0.25, 0.15);
+              osc("sine", f * 4, t, t + 0.25, g2);
+              const trem = ctx.createGain();
+              osc("sine", 4.6, t, t + d + 1.5, trem);
+              trem.gain.value = 0.025 * v;
+              trem.connect(g.gain);
+            } else if (inst === "pad") {
+              lp.frequency.value = 900;
+              g.gain.setValueAtTime(0.0001, t);
+              g.gain.linearRampToValueAtTime(0.035 * v, t + 0.8);
+              g.gain.setValueAtTime(0.035 * v, t + d - 0.2);
+              g.gain.linearRampToValueAtTime(0.0001, t + d + 0.9);
+              osc("sawtooth", f, t, t + d + 1, g, -7);
+              osc("sawtooth", f, t, t + d + 1, g, 7);
+            } else if (inst === "flute") {
+              lp.frequency.value = 2600;
+              g.gain.setValueAtTime(0.0001, t);
+              g.gain.linearRampToValueAtTime(0.06 * v, t + 0.06);
+              g.gain.setValueAtTime(0.06 * v, t + d * 0.8);
+              g.gain.linearRampToValueAtTime(0.0001, t + d + 0.15);
+              const o = osc("sine", f, t, t + d + 0.2, g);
+              const vib = ctx.createGain();
+              vib.gain.value = f * 0.006;
+              vib.connect(o.frequency);
+              osc("sine", 5.2, t, t + d + 0.2, vib);
+            } else if (inst === "bass") {
+              lp.frequency.value = 500;
+              env(g, t, 0.01, 0.2 * v, d + 0.3);
+              osc("sine", f, t, t + d + 0.4, g);
+              osc("triangle", f, t, t + d + 0.4, g);
+            }
+          }
+          function hat(t, v) {
+            if (!noise) {
+              noise = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+              const a = noise.getChannelData(0);
+              for (let i = 0; i < a.length; i++) a[i] = Math.random() * 2 - 1;
+            }
+            const s = ctx.createBufferSource(),
+              bp = ctx.createBiquadFilter(),
+              g = ctx.createGain();
+            s.buffer = noise;
+            bp.type = "bandpass";
+            bp.frequency.value = 7000;
+            bp.Q.value = 0.8;
+            s.connect(bp);
+            bp.connect(g);
+            g.connect(bus);
+            env(g, t, 0.004, 0.03 * v, 0.09);
+            s.start(t);
+            s.stop(t + 0.2);
+          }
+          function leadNote(chord, t, d, strong) {
+            const pcs = strong
+              ? chord.pcs
+              : MAJOR.map((x) => (x + track.key) % 12);
+            const pool = [];
+            for (let m = 64; m <= 86; m++)
+              if (pcs.includes(m % 12) && Math.abs(m - lead) <= 5) pool.push(m);
+            lead = pool.length ? pool[rand(pool.length)] : chord.notes[0] + 12;
+            voice(track.lead, lead, t, d, 0.75 + Math.random() * 0.25);
+          }
+          function schedule(t) {
+            const tr = track,
+              chord = tr.chords[bar % tr.chords.length],
+              nextChord = tr.chords[(bar + 1) % tr.chords.length],
+              s16 = 60 / tr.bpm / 4,
+              barLen = s16 * tr.steps;
+            if (tr.compSteps.includes(step)) {
+              const d =
+                tr.comp === "pad" ? barLen : step % 4 === 0 ? s16 * 3 : s16 * 2;
+              chord.notes.forEach((n) => voice(tr.comp, n, t, d, 0.8));
+            }
+            if (tr.hats.includes(step)) hat(t, step % 4 === 0 ? 0.6 : 1);
+            const b = chord.bass,
+              fifth = b + 7;
+            const bassAt = {
+              bossa: { 0: b, 6: fifth, 8: fifth, 14: b },
+              two: { 0: b, 8: fifth },
+              long: { 0: b, 10: b + 12 },
+              waltz: { 0: b },
+              walk: {
+                0: b,
+                4: chord.notes[0] - 12,
+                8: fifth,
+                12: nextChord.bass + (Math.random() < 0.5 ? -1 : 1),
+              },
+            }[tr.bass];
+            if (step in bassAt) {
+              const d = tr.bass === "long" ? s16 * 8 : s16 * 3;
+              voice("bass", bassAt[step], t, d, 1);
+            }
+            // sparse melody: rests every 4th bar, avoids overlapping notes
+            if (
+              step % 2 === 0 &&
+              bar % 4 !== 3 &&
+              t >= leadUntil &&
+              Math.random() < tr.leadProb
+            ) {
+              const len = s16 * 2 * (1 + rand(3));
+              leadNote(chord, t, len, step % 4 === 0);
+              leadUntil = t + len;
+            }
+          }
+          function pump() {
+            if (!track || !ctx) return;
+            while (next < ctx.currentTime + 0.25) {
+              const s16 = 60 / track.bpm / 4;
+              const sw = step % 4 === 2 ? track.swing * s16 * 0.5 : 0;
+              schedule(next + sw);
+              next += s16;
+              step++;
+              if (step >= track.steps) {
+                step = 0;
+                bar++;
+              }
+            }
+          }
+          function stop() {
+            clearInterval(timer);
+            timer = null;
+            track = null;
+            if (bus && ctx) {
+              const old = bus;
+              old.gain.cancelScheduledValues(ctx.currentTime);
+              old.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
+              setTimeout(() => old.disconnect(), 2500);
+            }
+            bus = null;
+          }
+          function play() {
+            if (!ctx || current < 0) return;
+            stop();
+            track = TRACKS[current];
+            bus = ctx.createGain();
+            bus.gain.value = 0;
+            bus.gain.setTargetAtTime(
+              duck ? LEVEL * 0.35 : LEVEL,
+              ctx.currentTime,
+              0.8,
+            );
+            bus.connect(ctx.destination);
+            // small echo for a lounge feel
+            fx = ctx.createGain();
+            const dl = ctx.createDelay(1),
+              fb = ctx.createGain(),
+              wet = ctx.createGain();
+            dl.delayTime.value = (60 / track.bpm) * 0.75;
+            fb.gain.value = 0.28;
+            wet.gain.value = 0.22;
+            fx.connect(bus);
+            fx.connect(dl);
+            dl.connect(fb);
+            fb.connect(dl);
+            dl.connect(wet);
+            wet.connect(bus);
+            step = 0;
+            bar = 0;
+            leadUntil = 0;
+            next = ctx.currentTime + 0.1;
+            timer = setInterval(pump, 50);
+            pump();
+          }
+          return {
+            get on() {
+              return on;
+            },
+            get name() {
+              return current >= 0 ? TRACKS[current].name : "";
+            },
+            // each new game plays the next track, cycling through all 5
+            newGame() {
+              let last = -1;
+              try {
+                last = +(localStorage.getItem("bingoLastTrack") ?? -1);
+              } catch (e) {}
+              current =
+                last >= 0 && last < TRACKS.length
+                  ? (last + 1) % TRACKS.length
+                  : rand(TRACKS.length);
+              try {
+                localStorage.setItem("bingoLastTrack", current);
+              } catch (e) {}
+              if (on) play();
+            },
+            toggle() {
+              on = !on;
+              try {
+                localStorage.setItem("bingoMusic", on ? "on" : "off");
+              } catch (e) {}
+              on ? play() : stop();
+            },
+            stop,
+            // quieter while the voice is speaking
+            duck(d) {
+              duck = Math.max(0, duck + d);
+              if (bus && ctx)
+                bus.gain.setTargetAtTime(
+                  duck ? LEVEL * 0.35 : LEVEL,
+                  ctx.currentTime,
+                  0.15,
+                );
+            },
+          };
+        })();
+        function updateMusicBtn() {
+          const b = $("#musicBtn");
+          b.textContent = music.on ? "🎵 Music" : "🔇 Music";
+          b.title = music.on ? `Playing: ${music.name}` : "Music off";
+        }
+
         const tick = () => tone(900 + rand(400), 0.04, 0.04, "square");
         const ding = () => {
           tone(880, 0.5, 0.2);
@@ -1078,7 +1474,15 @@
             opt = en;
             en = false;
           }
-          return new Promise((res) => {
+          return new Promise((resolve) => {
+            let finished = false;
+            const res = () => {
+              if (finished) return;
+              finished = true;
+              music.duck(-1);
+              resolve();
+            };
+            music.duck(1);
             try {
               const u = new SpeechSynthesisUtterance(text);
               const v = pickEnVoice();
@@ -1859,6 +2263,11 @@
               speechSynthesis.cancel();
             } catch (e) {}
         };
+        $("#musicBtn").onclick = () => {
+          unlockAudio();
+          music.toggle();
+          updateMusicBtn();
+        };
         $("#fsBtn").onclick = async () => {
           try {
             document.fullscreenElement
@@ -1920,6 +2329,7 @@
           try {
             speechSynthesis.cancel();
           } catch (e) {}
+          music.stop();
           $("#game").style.display = "none";
           $("#setup").style.display = "flex";
           $("#resumeBtn").style.display = "none";
