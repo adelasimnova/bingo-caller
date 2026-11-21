@@ -948,6 +948,39 @@
         }
         fitTv();
         addEventListener("resize", fitTv);
+        // ---------- keep the screen awake ----------
+        // Stops the TV (or laptop) from dimming, starting a screen saver or
+        // going to sleep while a game is on. Uses the Wake Lock API where the
+        // browser has it, and also plays a tiny invisible muted video in a
+        // loop, because TV browsers often lack Wake Lock but stay awake while
+        // a video is playing. Starts with the first game (needs a click).
+        let wakeLock = null,
+          awake = false;
+        const keepVideo = document.createElement("video");
+        keepVideo.src = "media/keepawake.mp4";
+        keepVideo.muted = true;
+        keepVideo.loop = true;
+        keepVideo.playsInline = true;
+        keepVideo.setAttribute("playsinline", "");
+        keepVideo.setAttribute("aria-hidden", "true");
+        keepVideo.style.cssText =
+          "position:fixed;right:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none";
+        async function keepAwake() {
+          awake = true;
+          if (!keepVideo.isConnected) document.body.appendChild(keepVideo);
+          keepVideo.play().catch(() => {});
+          try {
+            if ("wakeLock" in navigator && !wakeLock) {
+              wakeLock = await navigator.wakeLock.request("screen");
+              wakeLock.addEventListener("release", () => (wakeLock = null));
+            }
+          } catch (e) {}
+        }
+        // the browser drops the wake lock when the tab is hidden; take it back
+        document.addEventListener("visibilitychange", () => {
+          if (awake && document.visibilityState === "visible") keepAwake();
+        });
+
         // hide the mouse pointer after 3 s without movement
         let idleT = null;
         addEventListener("mousemove", () => {
@@ -1104,6 +1137,7 @@
           music.newGame();
           updateMusicBtn();
           clips.load();
+          keepAwake();
           $("#setup").style.display = "none";
           $("#game").style.display = "block";
           buildBoard();
