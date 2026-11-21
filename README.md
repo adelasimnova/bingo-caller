@@ -2,6 +2,8 @@
 
 A bingo number caller that runs in the browser. It is one HTML file with no build step and no dependencies to install.
 
+> **Note:** This project is entirely AI-generated and was made just for fun.
+
 ## Features
 
 - **Two game modes:** 1–75 (5×5 cards with columns B I N G O) or 1–90 (tombola, 3 rows × 9)
