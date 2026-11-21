@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bingo Caller</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#140f2b; --panel:#1f1842; --panel2:#2a2156; --ink:#fff7e8; --muted:#b9b0de;
+    --hot:#ff4f8b; --sun:#ffc93c; --mint:#3ee6b3; --sky:#4fb6ff; --violet:#a777ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 15% -10%, #3a1f6e 0%, transparent 60%),
+               radial-gradient(900px 600px at 110% 110%, #5b1840 0%, transparent 60%), var(--bg);
+    color:var(--ink); font-family:"Bricolage Grotesque",system-ui,sans-serif; overflow-x:hidden;
+  }
+  button{font:inherit;cursor:pointer;border:0;border-radius:14px;color:var(--ink)}
+  .wrap{max-width:1300px;margin:0 auto;padding:20px}
+  h1{font-weight:800;letter-spacing:-.02em;margin:0}
+  .muted{color:var(--muted)}
+
+  /* SETUP */
+  #setup{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:var(--panel);border-radius:24px;padding:32px;max-width:620px;width:100%;
+        box-shadow:0 30px 80px rgba(0,0,0,.4)}
+  .logo{font-size:64px;line-height:1;font-weight:800;margin-bottom:6px}
+  .logo span:nth-child(1){color:var(--hot)} .logo span:nth-child(2){color:var(--sun)}
+  .logo span:nth-child(3){color:var(--mint)} .logo span:nth-child(4){color:var(--sky)}
+  .logo span:nth-child(5){color:var(--violet)}
+  .field{margin-top:22px}
+  .field > label{display:block;font-weight:800;margin-bottom:8px}
+  .seg{display:flex;gap:8px;flex-wrap:wrap}
+  .seg button{background:var(--panel2);padding:12px 16px;flex:1;min-width:110px;text-align:left}
+  .seg button small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+  .seg button.on{background:var(--ink);color:var(--bg)}
+  .seg button.on small{color:#4b4370}
+  .big{background:var(--hot);font-size:22px;font-weight:800;padding:18px;width:100%;margin-top:28px}
+  .big:hover{filter:brightness(1.1)}
+  .ghost{background:transparent;color:var(--muted);text-decoration:underline;margin-top:10px;width:100%;padding:8px}
+
+  /* GAME */
+  #game{display:none}
+  .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .top h1{font-size:28px;flex:1}
+  .pill{background:var(--panel);padding:10px 14px;border-radius:999px;font-size:15px}
+  .tb{background:var(--panel2);padding:10px 14px;font-size:15px}
+  .tb:hover{background:#3a2f72}
+
+  .stage{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;margin-top:18px}
+  @media (max-width:900px){.stage{grid-template-columns:1fr}}
+
+  .ball-area{background:var(--panel);border-radius:28px;padding:24px;display:flex;flex-direction:column;align-items:center}
+  .ball{width:min(52vh,90%);aspect-ratio:1;border-radius:50%;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;position:relative;
+        background:radial-gradient(circle at 32% 28%, #fff 0 8%, transparent 30%), var(--c,#3a2f72);
+        box-shadow:inset -20px -30px 60px rgba(0,0,0,.35), 0 20px 50px rgba(0,0,0,.4);
+        transition:background-color .2s}
+  .ball .inner{width:62%;aspect-ratio:1;border-radius:50%;background:#fffaf0;color:#1a1433;
+        display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ball .letter{font-size:min(7vh,48px);font-weight:800;line-height:1;color:var(--c)}
+  .ball .num{font-size:min(20vh,150px);font-weight:800;line-height:.9;letter-spacing:-.04em}
+  .ball.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+  .ball.spin .inner{animation:shake .08s infinite}
+  @keyframes pop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+  @keyframes shake{0%{transform:translate(1px,0)}50%{transform:translate(-1px,1px)}100%{transform:translate(0,-1px)}}
+  .placeholder .num{font-size:min(10vh,70px)}
+
+  .controls{display:flex;gap:10px;margin-top:22px;width:100%;flex-wrap:wrap}
+  .next{flex:2;background:var(--mint);color:#082a20;font-size:24px;font-weight:800;padding:20px;min-width:220px}
+  .next:disabled{opacity:.4;cursor:default}
+  .auto{flex:1;background:var(--sun);color:#3a2800;font-weight:800;font-size:18px;padding:20px;min-width:140px}
+  .auto.running{background:var(--hot);color:#fff}
+  .sub{display:flex;gap:10px;margin-top:10px;width:100%;flex-wrap:wrap}
+  .sub button{flex:1;background:var(--panel2);padding:12px;min-width:120px}
+  .bingo-btn{background:linear-gradient(90deg,var(--hot),var(--violet))!important;font-weight:800}
+  .hint{margin-top:12px;font-size:13px;color:var(--muted);text-align:center}
+
+  .side{display:flex;flex-direction:column;gap:20px}
+  .box{background:var(--panel);border-radius:24px;padding:20px}
+  .box h2{margin:0 0 12px;font-size:18px;display:flex;justify-content:space-between}
+  .recent{display:flex;gap:10px;flex-wrap:wrap;min-height:64px}
+  .chip{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        background:var(--c);font-weight:800;font-size:22px;line-height:1;box-shadow:inset -6px -8px 14px rgba(0,0,0,.3)}
+  .chip small{font-size:11px;opacity:.85}
+  .chip:first-child{outline:3px solid var(--ink);outline-offset:3px}
+
+  .board{display:grid;gap:5px}
+  .board .row{display:grid;gap:5px;align-items:center}
+  .board .lab{font-weight:800;font-size:18px;text-align:center;border-radius:8px;padding:4px 0}
+  .cell{aspect-ratio:1;border-radius:8px;background:var(--panel2);display:flex;align-items:center;justify-content:center;
+        font-size:clamp(10px,1.3vw,15px);color:#7d73ad;font-weight:500;transition:all .25s}
+  .cell.hit{background:var(--c);color:#fff;font-weight:800;transform:scale(1.04)}
+  .cell.last{outline:3px solid var(--ink)}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(10,6,25,.8);display:none;align-items:center;justify-content:center;z-index:10;padding:20px}
+  .modal.show{display:flex}
+  .modal .card{text-align:center}
+  .modal .card h2{font-size:34px;margin:0 0 8px}
+  .modal .row2{display:flex;gap:10px;margin-top:22px}
+  .modal .row2 button{flex:1;padding:16px;font-weight:800;font-size:18px}
+  .check-in{display:flex;gap:8px;margin-top:18px}
+  .check-in input{flex:1;font:inherit;font-size:20px;padding:12px 14px;border-radius:12px;border:0;background:var(--panel2);color:var(--ink)}
+  .mini{display:grid;gap:4px;margin-top:16px}
+  .mini div{aspect-ratio:1;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:clamp(12px,2vw,18px);background:var(--panel2);color:#9a91c8}
+  .mini .e{background:transparent;border:1px dashed #3a2f72}
+  .mini .h{background:var(--mint);color:#082a20}
+  .mini .m{background:#3a2f72;color:#fff;outline:2px solid var(--hot)}
+  .mini .f{background:var(--sun);color:#3a2800}
+  .mini .win{box-shadow:0 0 0 3px var(--sun) inset}
+  .card{max-height:96vh;overflow:auto}
+  .check-out{margin-top:14px;font-size:18px;min-height:28px}
+  .ok{color:var(--mint)} .bad{color:var(--hot)}
+
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:20}
+  .animal{font-size:clamp(22px,3.2vw,38px);font-weight:800;margin-top:16px;min-height:1.2em;text-align:center}
+  .finished{font-size:20px;color:var(--sun);margin-top:12px;font-weight:800}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section id="setup">
+  <div class="card">
+    <div class="logo"><span>B</span><span>I</span><span>N</span><span>G</span><span>O</span></div>
+    <p class="muted" style="margin:0">Party number caller. Set up the game and hit start.</p>
+
+    <div class="field">
+      <label>Which cards are you using?</label>
+      <div class="seg" id="segMode">
+        <button data-v="75">1 – 75<small>5×5, columns B I N G O</small></button>
+        <button data-v="90" class="on">1 – 90<small>tombola, 3 rows × 9</small></button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Voice</label>
+      <div class="seg" id="segVoice">
+        <button data-v="2">On<small>calls each number twice</small></button>
+        <button data-v="1" class="on">On<small>calls each number once</small></button>
+        <button data-v="0">Off<small>sound effects only</small></button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Auto draw</label>
+      <div class="seg" id="segAuto">
+        <button data-v="5" class="on">Fast<small>every 5 s</small></button>
+        <button data-v="9">Normal<small>every 9 s</small></button>
+        <button data-v="13">Slow<small>every 13 s</small></button>
+      </div>
+    </div>
+
+    <button class="big" id="startBtn">Start game 🎉</button>
+    <button class="ghost" id="resumeBtn" style="display:none">Resume unfinished game</button>
+  </div>
+</section>
+
+<!-- GAME -->
+<section id="game">
+  <div class="wrap">
+    <div class="top">
+      <h1>Bingo 🎱</h1>
+      <span class="pill" id="count">0 / 75</span>
+      <button class="tb" id="voiceToggle">🔊 Voice</button>
+      <button class="tb" id="fsBtn">⛶ Fullscreen</button>
+      <button class="tb" id="newBtn">↺ New game</button>
+    </div>
+
+    <div class="stage">
+      <div class="ball-area">
+        <div class="ball placeholder" id="ball" style="--c:#3a2f72">
+          <div class="inner"><div class="letter" id="ballLetter"></div><div class="num" id="ballNum">?</div></div>
+        </div>
+        <div class="animal" id="ballAnimal"></div>
+        <div class="finished" id="finished" style="display:none">All numbers have been drawn!</div>
+        <div class="controls">
+          <button class="next" id="nextBtn">Next number</button>
+          <button class="auto" id="autoBtn">▶ Auto</button>
+        </div>
+        <div class="sub">
+          <button id="repeatBtn">🔁 Repeat</button>
+          <button id="checkBtn">🔎 Check card</button>
+          <button class="bingo-btn" id="bingoBtn">🎉 LINE / BINGO</button>
+        </div>
+        <div class="hint">Space = next number · A = auto · R = repeat · B = line / bingo</div>
+      </div>
+
+      <div class="side">
+        <div class="box">
+          <h2>Latest numbers</h2>
+          <div class="recent" id="recent"></div>
+        </div>
+        <div class="box">
+          <h2><span>Drawn</span><span class="muted" id="boardInfo"></span></h2>
+          <div class="board" id="board"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- modals -->
+<div class="modal" id="mBingo">
+  <div class="card">
+    <h2>🎉 LINE / BINGO 🎉</h2>
+    <p class="muted">Drawing is paused. Enter the card number (printed above the card as “Karta č. …”).</p>
+    <div class="check-in"><input id="checkInput" placeholder="Card number, e.g. 17" inputmode="numeric"><button class="tb" id="checkGo">Check</button></div>
+    <div class="mini" id="checkCard"></div>
+    <div class="check-out" id="checkOut"></div>
+    <div class="row2">
+      <button style="background:var(--panel2)" id="continueBtn">Continue game</button>
+      <button style="background:var(--hot)" id="endBtn">New game</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mNew">
+  <div class="card">
+    <h2>New game?</h2>
+    <p class="muted">All drawn numbers will be cleared.</p>
+    <div class="row2">
+      <button style="background:var(--panel2)" id="noNew">No</button>
+      <button style="background:var(--hot)" id="yesNew">Yes, new game</button>
+    </div>
+  </div>
+</div>
+
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const LETTERS = ['B','I','N','G','O'];
+  const ANIMALS = {
+    B:[['Buffalo','🐃'],['Baboon','🐒'],['Bear','🐻'],['Beaver','🦫'],['Bumblebee','🐝']],
+    I:[['Iguana','🦎'],['Impala','🦌'],['Ibis','🦩'],['Insect','🐞']],
+    N:[['Narwhal','🐋'],['Newt','🦎'],['Nightingale','🐦'],['Nanny goat','🐐']],
+    G:[['Gorilla','🦍'],['Giraffe','🦒'],['Goat','🐐'],['Gecko','🦎'],['Goose','🪿']],
+    O:[['Octopus','🐙'],['Owl','🦉'],['Ostrich','🦤'],['Otter','🦦'],['Orangutan','🦧']]
+  };
+  const lastAnimal = {};
+  function animalFor(L){
+    const list = ANIMALS[L]; let a;
+    do { a = list[rand(list.length)]; } while(list.length>1 && a===lastAnimal[L]);
+    lastAnimal[L]=a; return a;
+  }
+  const animalOf = {};
+  const COLORS75 = ['#ff4f8b','#ffb020','#2fcf9c','#3a9cf0','#9a6bff'];
+  const COLORS90 = ['#ff4f8b','#ff7a3d','#ffb020','#b5d33a','#2fcf9c','#2bb8d6','#3a9cf0','#7a7cff','#c065ff'];
+
+  const S = { mode:90, voice:1, interval:5, called:[], pool:[], auto:false };
+  let timer = null, busy = false, voiceOn = true;
+
+  // ---------- storage (optional) ----------
+  const save = () => { try { localStorage.setItem('bingoState', JSON.stringify({mode:S.mode,voice:S.voice,interval:S.interval,called:S.called})); } catch(e){} };
+  const load = () => { try { return JSON.parse(localStorage.getItem('bingoState')||'null'); } catch(e){ return null; } };
+
+  // ---------- setup ----------
+  function seg(id, key){
+    const el = $(id);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('button'); if(!b) return;
+      el.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b));
+      S[key] = Number(b.dataset.v);
+    });
+  }
+  seg('#segMode','mode'); seg('#segVoice','voice'); seg('#segAuto','interval');
+
+  const prev = load();
+  if (prev && prev.called && prev.called.length) {
+    $('#resumeBtn').style.display = 'block';
+    $('#resumeBtn').textContent = `Resume unfinished game (${prev.called.length} numbers drawn, 1–${prev.mode})`;
+  }
+
+  $('#startBtn').onclick = () => { unlockAudio(); startGame([]); };
+  $('#resumeBtn').onclick = () => {
+    unlockAudio();
+    S.mode = prev.mode; S.voice = prev.voice; S.interval = prev.interval;
+    startGame(prev.called);
+  };
+
+  function startGame(called){
+    S.called = called.slice();
+    for (const k in animalOf) delete animalOf[k];
+    for (const k in lastAnimal) delete lastAnimal[k];
+    const all = Array.from({length:S.mode}, (_,i)=>i+1);
+    S.pool = all.filter(n => !S.called.includes(n));
+    voiceOn = S.voice > 0;
+    updateVoiceBtn();
+    $('#setup').style.display = 'none';
+    $('#game').style.display = 'block';
+    buildBoard();
+    render(false);
+    save();
+  }
+
+  // ---------- helpers ----------
+  const colIndex = n => S.mode===75 ? Math.floor((n-1)/15) : Math.min(8, Math.floor(n/10));
+  const colorOf = n => S.mode===75 ? COLORS75[colIndex(n)] : COLORS90[colIndex(n)];
+  const letterOf = n => S.mode===75 ? LETTERS[colIndex(n)] : '';
+  const rand = max => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % max; };
+
+  // ---------- board ----------
+  function buildBoard(){
+    const b = $('#board'); b.innerHTML='';
+    if (S.mode===75){
+      for(let r=0;r<5;r++){
+        const row = document.createElement('div'); row.className='row';
+        row.style.gridTemplateColumns = '34px repeat(15,1fr)';
+        const lab = document.createElement('div'); lab.className='lab'; lab.textContent=LETTERS[r];
+        lab.style.background = COLORS75[r]; row.appendChild(lab);
+        for(let i=1;i<=15;i++){ row.appendChild(cell(r*15+i)); }
+        b.appendChild(row);
+      }
+    } else {
+      for(let r=0;r<9;r++){
+        const row = document.createElement('div'); row.className='row';
+        row.style.gridTemplateColumns = 'repeat(10,1fr)';
+        for(let i=0;i<10;i++){ const n=r*10+i+1; if(n<=90) row.appendChild(cell(n)); }
+        b.appendChild(row);
+      }
+    }
+  }
+  function cell(n){
+    const c=document.createElement('div'); c.className='cell'; c.id='c'+n; c.textContent=n;
+    c.style.setProperty('--c', colorOf(n)); return c;
+  }
+
+  function render(animateLast){
+    const last = S.called[S.called.length-1];
+    $('#count').textContent = `${S.called.length} / ${S.mode}`;
+    $('#boardInfo').textContent = `${S.pool.length} left`;
+    document.querySelectorAll('.cell').forEach(c=>c.classList.remove('hit','last'));
+    S.called.forEach(n=>{ const c=$('#c'+n); if(c) c.classList.add('hit'); });
+    if(last){ $('#c'+last)?.classList.add('last'); showBall(last, animateLast); }
+    else { const ball=$('#ball'); ball.classList.add('placeholder'); ball.style.setProperty('--c','#3a2f72'); $('#ballLetter').textContent=''; $('#ballNum').textContent='?'; $('#ballAnimal').textContent=''; }
+    const rec = $('#recent'); rec.innerHTML='';
+    S.called.slice(-6).reverse().forEach(n=>{
+      const d=document.createElement('div'); d.className='chip'; d.style.setProperty('--c',colorOf(n));
+      d.innerHTML = (letterOf(n)?`<small>${letterOf(n)}</small>`:'') + n; rec.appendChild(d);
+    });
+    if(!last) rec.innerHTML = '<span class="muted">Nothing yet – press “Next number”.</span>';
+    const done = S.pool.length===0;
+    $('#nextBtn').disabled = done; $('#finished').style.display = done?'block':'none';
+    if(done) stopAuto();
+  }
+
+  function showBall(n, animate){
+    const ball=$('#ball');
+    ball.classList.remove('placeholder','spin');
+    ball.style.setProperty('--c', colorOf(n));
+    $('#ballLetter').textContent = letterOf(n);
+    $('#ballNum').textContent = n;
+    const a = S.mode===75 ? animalOf[n] : null; $('#ballAnimal').textContent = a ? `${letterOf(n)} for ${a[0]} ${a[1]}` : '';
+    if(animate){ ball.classList.remove('pop'); void ball.offsetWidth; ball.classList.add('pop'); }
+  }
+
+  // ---------- draw ----------
+  async function draw(){
+    if(busy || S.pool.length===0) return;
+    busy = true; $('#nextBtn').disabled = true;
+    const idx = rand(S.pool.length);
+    const n = S.pool.splice(idx,1)[0];
+
+    // shuffle animation
+    const ball=$('#ball'); ball.classList.remove('placeholder'); ball.classList.add('spin'); $('#ballAnimal').textContent='';
+    if(S.mode===75) animalOf[n] = animalFor(letterOf(n));
+    const t0 = performance.now();
+    while(performance.now()-t0 < 1100){
+      const f = 1 + rand(S.mode);
+      ball.style.setProperty('--c', colorOf(f));
+      $('#ballLetter').textContent = letterOf(f); $('#ballNum').textContent = f;
+      tick();
+      await sleep(70 + (performance.now()-t0)/12);
+    }
+    S.called.push(n); save();
+    ding();
+    render(true);
+    busy = false;
+    if(S.pool.length) $('#nextBtn').disabled = false;
+    await announce(n);
+  }
+
+  const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+  // ---------- auto ----------
+  function startAuto(){
+    if(S.pool.length===0) return;
+    S.auto = true; $('#autoBtn').classList.add('running'); $('#autoBtn').textContent='⏸ Pauza';
+    loop();
+  }
+  async function loop(){
+    if(!S.auto) return;
+    await draw();
+    if(!S.auto) return;
+    timer = setTimeout(loop, S.interval*1000);
+  }
+  function stopAuto(){
+    S.auto=false; clearTimeout(timer);
+    $('#autoBtn').classList.remove('running'); $('#autoBtn').textContent='▶ Auto';
+  }
+
+  // ---------- sound & voice ----------
+  let ctx = null;
+  function unlockAudio(){
+    try{ ctx = ctx || new (window.AudioContext||window.webkitAudioContext)(); ctx.resume(); }catch(e){}
+    try{ speechSynthesis.getVoices(); }catch(e){}
+  }
+  function tone(freq, dur, vol, type){
+    if(!ctx) return;
+    try{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=type||'sine'; o.frequency.value=freq; g.gain.value=vol;
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+dur);
+    }catch(e){}
+  }
+  const tick = () => tone(900+rand(400), .04, .04, 'square');
+  const ding = () => { tone(880,.5,.2); setTimeout(()=>tone(1320,.6,.15),90); };
+
+  function pickVoice(){
+    try{
+      const v = speechSynthesis.getVoices();
+      const sk = v.filter(x=>/^sk/i.test(x.lang));
+      return sk.find(x=>/laura/i.test(x.name)) || sk.find(x=>/google|microsoft|natural|premium|enhanced/i.test(x.name)) || sk[0] || null;
+    }catch(e){ return null; }
+  }
+  function pickEnVoice(){
+    try{
+      const v = speechSynthesis.getVoices().filter(x=>/^en/i.test(x.lang));
+      const gb = v.filter(x=>/en[-_]GB/i.test(x.lang));
+      return v.find(x=>/daniel/i.test(x.name)) || gb.find(x=>/google|premium|enhanced/i.test(x.name)) || gb[0] || v.find(x=>/samantha/i.test(x.name)) || v[0] || null;
+    }catch(e){ return null; }
+  }
+  function speak(text, en){
+    let opt = {};
+    if(en && typeof en==='object'){ opt=en; en=false; }
+    return new Promise(res=>{
+      try{
+        const u = new SpeechSynthesisUtterance(text);
+        const v = pickEnVoice(); if(v) u.voice=v; u.lang = v ? v.lang : 'en-GB';
+        u.rate = opt.rate||.9; u.pitch = opt.pitch||1; u.onend = res; u.onerror = res;
+        speechSynthesis.speak(u);
+        setTimeout(res, 6000);
+      }catch(e){ res(); }
+    });
+  }
+  const pick = arr => arr[rand(arr.length)];
+  const OUTROS = [
+    'Mark it!', 'Who\'s got it?', 'Eyes down!', 'Wake up, people!', 'Ooh, that hurts.',
+    'Lovely!', 'I wish I had that one.', 'Check your cards!', 'Somebody\'s smiling…'
+  ];
+  const SPECIAL = {
+    1:'Kelly\'s eye, number one!', 7:'Lucky seven!', 9:'Doctor\'s orders, number nine!', 10:'Cock and hen, number ten!',
+    11:'Legs eleven!', 13:'Unlucky for some, thirteen!', 18:'Coming of age, eighteen!', 21:'Key of the door, twenty-one!',
+    22:'Two little ducks, twenty-two!', 33:'All the threes, thirty-three!', 44:'Droopy drawers, forty-four!',
+    55:'Snakes alive, fifty-five!', 66:'Clickety click, sixty-six!', 69:'Sixty-nine… no comment.',
+    77:'Sunset strip, seventy-seven!', 88:'Two fat ladies, eighty-eight!', 90:'Top of the shop, ninety!'
+  };
+  async function announce(n){
+    if(!voiceOn || S.voice===0) return;
+    try{ speechSynthesis.cancel(); }catch(e){}
+    const L = letterOf(n);
+    const a = S.mode===75 ? animalOf[n] : null;
+    const core = L && a ? `${L} for ${a[0]}, ${n}` : `${n}`;
+    const left = S.pool.length;
+    if(S.called.length===1) await speak('Eyes down, here we go! The first number is', {pitch:1.1, rate:1.02});
+    else if(left===5) await speak('Only five balls left in the drum!', {pitch:1.1});
+    await sleep(200);
+    if(SPECIAL[n] && S.mode===90) await speak(SPECIAL[n], {pitch:1.1, rate:.95});
+    else await speak(core, {pitch:1.05, rate:.9});
+    if(S.voice===2){ await sleep(450); await speak(`I repeat, ${core}`, {pitch:1, rate:.92}); }
+  }
+  function updateVoiceBtn(){ $('#voiceToggle').textContent = voiceOn ? '🔊 Voice' : '🔇 Voice'; }
+
+  // ---------- check card ----------
+  const CARDS90 = {"1":[[1,null,21,38,null,null,null,77,80],[2,10,null,39,41,null,63,null,null],[9,null,null,null,48,51,65,null,82]],"2":[[4,10,null,34,null,null,69,75,null],[null,null,27,null,47,50,null,76,80],[6,null,null,39,49,null,null,78,86]],"3":[[5,10,null,33,null,null,61,74,null],[null,12,null,null,40,null,69,76,88],[null,16,20,null,41,57,null,78,null]],"4":[[9,14,null,null,41,null,null,72,81],[null,19,23,null,null,56,null,78,83],[null,null,28,34,null,null,62,79,87]],"5":[[null,10,20,31,41,54,null,null,null],[null,null,21,null,42,56,64,null,85],[3,19,22,null,49,null,null,76,null]],"6":[[null,11,null,32,42,51,null,null,82],[8,12,22,null,null,54,null,73,null],[null,null,27,37,46,null,60,null,87]],"7":[[null,10,null,null,41,null,61,75,81],[4,15,20,null,null,55,null,null,85],[null,18,null,30,49,null,63,79,null]],"8":[[null,12,26,null,42,null,null,72,84],[8,null,null,32,49,null,63,null,87],[null,15,null,34,null,59,66,79,null]],"9":[[8,null,null,33,48,null,64,null,82],[null,16,null,null,null,53,65,70,84],[null,null,26,37,49,null,66,null,87]],"10":[[null,12,25,null,null,null,68,77,83],[4,15,27,null,41,53,null,null,null],[null,null,29,35,48,57,69,null,null]],"11":[[null,10,null,38,41,56,null,null,83],[6,13,null,null,null,null,67,79,89],[7,19,20,null,46,59,null,null,null]],"12":[[4,null,null,30,46,51,null,null,81],[null,16,22,null,null,57,62,73,null],[7,19,null,35,null,null,null,77,86]],"13":[[null,null,21,32,null,null,61,76,84],[null,12,null,39,null,51,null,79,85],[8,16,23,null,40,null,null,null,87]],"14":[[2,null,23,35,44,null,null,70,null],[3,null,24,null,46,null,62,72,null],[null,15,null,39,null,53,null,73,83]],"15":[[7,null,null,30,null,53,null,75,82],[9,15,26,null,null,null,null,79,85],[null,19,null,37,46,null,60,null,86]],"16":[[null,10,24,34,42,55,null,null,null],[null,15,27,null,null,59,null,72,84],[5,null,null,35,47,null,63,null,87]],"17":[[3,18,23,null,null,53,null,73,null],[5,null,null,34,43,null,null,74,80],[null,null,24,38,null,58,63,null,89]],"18":[[null,12,null,36,43,null,null,75,83],[1,13,21,null,49,52,null,null,null],[null,null,24,38,null,57,67,null,88]],"19":[[3,null,null,34,42,52,null,null,90],[6,13,21,35,null,null,null,72,null],[7,14,null,null,49,null,67,79,null]],"20":[[null,10,21,30,44,null,65,null,null],[2,null,null,35,null,53,69,70,null],[9,null,null,36,null,55,null,77,85]],"21":[[null,null,29,33,40,null,null,74,81],[null,11,null,36,44,null,66,76,null],[1,13,null,39,null,55,69,null,null]],"22":[[1,null,null,35,40,null,null,77,85],[null,15,null,37,42,50,null,null,90],[null,18,20,null,45,57,68,null,null]],"23":[[null,null,24,33,null,50,64,74,null],[null,null,null,37,null,53,66,77,86],[8,14,null,38,41,null,68,null,null]],"24":[[null,16,21,null,null,51,67,null,83],[2,null,27,null,42,57,null,70,null],[5,null,null,34,46,null,null,73,87]],"25":[[2,18,null,null,null,null,61,70,82],[null,null,24,34,41,null,62,null,85],[null,null,null,35,null,57,68,77,86]],"26":[[4,null,22,null,42,null,63,79,null],[null,13,null,31,47,54,null,null,80],[7,15,null,38,null,57,null,null,82]],"27":[[6,11,null,null,null,56,61,null,87],[8,13,null,null,46,57,null,72,null],[null,16,24,32,48,null,null,74,null]],"28":[[2,10,23,30,null,null,68,null,null],[null,13,null,31,42,null,null,70,88],[null,14,25,38,null,54,null,73,null]],"29":[[8,null,22,null,41,50,null,74,null],[null,11,24,null,43,null,64,75,null],[null,null,28,36,47,55,null,null,82]],"30":[[null,12,20,31,46,null,null,null,81],[8,14,21,null,null,52,null,null,86],[null,null,25,null,49,55,69,76,null]],"31":[[4,10,null,31,null,54,63,null,null],[5,15,null,null,43,56,null,null,85],[null,18,20,35,null,null,66,71,null]],"32":[[3,null,25,null,null,52,60,null,88],[7,13,null,33,42,57,null,null,null],[null,14,28,null,null,null,62,78,89]],"33":[[3,11,null,null,42,50,67,null,null],[null,14,20,30,null,52,null,72,null],[null,null,25,35,null,59,null,79,88]],"34":[[null,16,null,null,45,55,62,73,null],[1,null,23,33,null,null,null,76,83],[2,18,null,null,47,59,63,null,null]],"35":[[1,null,23,null,null,50,61,74,null],[null,19,24,31,null,null,68,null,88],[3,null,25,36,43,53,null,null,null]],"36":[[2,12,null,null,null,52,67,null,80],[null,18,null,null,43,59,null,73,84],[5,null,25,34,46,null,null,76,null]],"37":[[7,14,null,35,null,null,64,null,88],[null,15,null,39,40,50,null,72,null],[null,17,28,null,null,53,69,null,89]],"38":[[3,12,null,34,null,56,null,null,80],[null,17,null,null,41,null,66,75,85],[null,18,20,36,43,null,null,79,null]],"39":[[null,14,null,null,null,55,69,71,86],[5,null,null,30,43,56,null,72,null],[8,17,21,null,null,null,null,73,88]],"40":[[6,12,20,null,40,52,null,null,null],[null,null,22,35,42,null,null,73,84],[8,null,24,36,null,null,62,75,null]]};
+  const CARDS75 = {"1":[[1,7,10,14,15],[16,17,19,21,29],[32,36,null,38,39],[46,52,58,59,60],[63,66,68,70,72]],"2":[[1,7,10,14,15],[16,17,19,21,29],[32,36,null,38,39],[46,52,58,59,60],[63,66,68,70,72]],"3":[[1,3,8,10,12],[18,19,24,27,28],[36,37,null,42,45],[49,50,54,55,59],[61,63,68,71,72]],"4":[[1,3,8,10,12],[18,19,24,27,28],[36,37,null,42,45],[49,50,54,55,59],[61,63,68,71,72]],"5":[[10,12,13,14,15],[16,18,25,29,30],[32,35,null,40,44],[48,49,54,56,59],[62,67,69,74,75]],"6":[[10,12,13,14,15],[16,18,25,29,30],[32,35,null,40,44],[48,49,54,56,59],[62,67,69,74,75]],"7":[[7,8,12,14,15],[16,19,25,29,30],[32,35,null,41,45],[48,49,52,55,60],[61,63,69,71,75]],"8":[[7,8,12,14,15],[16,19,25,29,30],[32,35,null,41,45],[48,49,52,55,60],[61,63,69,71,75]],"9":[[5,7,9,12,14],[16,18,24,27,30],[32,34,null,37,41],[46,47,49,50,59],[61,62,63,65,71]],"10":[[5,7,9,12,14],[16,18,24,27,30],[32,34,null,37,41],[46,47,49,50,59],[61,62,63,65,71]],"11":[[1,5,6,10,12],[17,18,24,25,29],[31,32,null,37,38],[46,50,53,55,59],[62,63,66,67,75]],"12":[[1,5,6,10,12],[17,18,24,25,29],[31,32,null,37,38],[46,50,53,55,59],[62,63,66,67,75]],"13":[[1,6,8,14,15],[16,20,23,25,29],[33,34,null,41,45],[51,52,53,57,60],[62,63,68,69,74]],"14":[[1,6,8,14,15],[16,20,23,25,29],[33,34,null,41,45],[51,52,53,57,60],[62,63,68,69,74]],"15":[[1,3,4,9,11],[16,17,19,25,27],[37,38,null,43,44],[46,48,54,59,60],[63,64,67,69,70]],"16":[[1,3,4,9,11],[16,17,19,25,27],[37,38,null,43,44],[46,48,54,59,60],[63,64,67,69,70]],"17":[[5,9,10,12,15],[21,22,26,28,29],[33,37,null,40,45],[49,51,53,54,57],[62,65,66,69,71]],"18":[[5,9,10,12,15],[21,22,26,28,29],[33,37,null,40,45],[49,51,53,54,57],[62,65,66,69,71]],"19":[[5,6,13,14,15],[16,19,20,24,26],[33,35,null,40,41],[49,51,52,56,60],[63,65,67,71,72]],"20":[[5,6,13,14,15],[16,19,20,24,26],[33,35,null,40,41],[49,51,52,56,60],[63,65,67,71,72]]};
+  function checkCard(){
+    const id = parseInt($('#checkInput').value,10);
+    const set = S.mode===90 ? CARDS90 : CARDS75;
+    const box = $('#checkCard'); box.innerHTML='';
+    if(!set[id]){ $('#checkOut').innerHTML=`<span class="muted">Card #${isNaN(id)?'?':id} doesn't exist (cards are 1–${Object.keys(set).length}).</span>`; return; }
+    const hit = n => n===null || S.called.includes(n);
+    let msg, say, ok;
+    if(S.mode===90){
+      const g = set[id];
+      const rowsDone = g.map(r=>r.every(hit));
+      const done = rowsDone.filter(Boolean).length;
+      box.style.gridTemplateColumns='repeat(9,1fr)';
+      g.forEach((r,ri)=>r.forEach(n=>{
+        const d=document.createElement('div');
+        if(n===null){ d.className='e'; } else { d.textContent=n; d.className = S.called.includes(n)?'h':'m'; if(rowsDone[ri]) d.classList.add('win'); }
+        box.appendChild(d);
+      }));
+      const missing = g.flat().filter(n=>n!==null && !S.called.includes(n));
+      ok = done>0;
+      if(done===3){ msg='✅ BINGO – full house, all 15 numbers drawn! Game over.'; say='Bingo! Full house! We have a winner!'; }
+      else if(done>0){ msg='✅ LINE – a full row! The game continues.'; say='Line! We have a winner! Let\'s keep playing.'; }
+      else { msg=`❌ False call! No complete row. Still missing: ${missing.join(', ')}`; }
+      if(ok && done<3) msg += ` <span class="muted">(${missing.length} more for BINGO)</span>`;
+    } else {
+      const g = set[id]; // columns
+      const at=(c,r)=>g[c][r];
+      const lines=[];
+      for(let r=0;r<5;r++) lines.push([0,1,2,3,4].map(c=>[c,r]));
+      for(let c=0;c<5;c++) lines.push([0,1,2,3,4].map(r=>[c,r]));
+      lines.push([0,1,2,3,4].map(i=>[i,i])); lines.push([0,1,2,3,4].map(i=>[i,4-i]));
+      const won = lines.filter(l=>l.every(([c,r])=>hit(at(c,r))));
+      const winCells = new Set(won.flat().map(([c,r])=>c+','+r));
+      box.style.gridTemplateColumns='repeat(5,1fr)';
+      for(let r=0;r<5;r++) for(let c=0;c<5;c++){
+        const n=at(c,r), d=document.createElement('div');
+        if(n===null){ d.textContent='★'; d.className='f'; } else { d.textContent=n; d.className=S.called.includes(n)?'h':'m'; }
+        if(winCells.has(c+','+r)) d.classList.add('win');
+        box.appendChild(d);
+      }
+      const full = g.flat().every(hit);
+      ok = won.length>0;
+      if(full){ msg='✅ FULL HOUSE!'; say='Full house! We have a winner!'; }
+      else if(ok){ msg = won.length===1 ? '✅ Full line – BINGO!' : `✅ ${won.length} full lines – BINGO!`; say='Bingo! We have a winner!'; }
+      else { msg='❌ False bingo! No complete line.'; }
+    }
+    try{ speechSynthesis.cancel(); }catch(e){}
+    if(ok){
+      $('#checkOut').innerHTML = `<span class="ok">${msg}</span>`;
+      confetti(); tone(523,.2,.2); setTimeout(()=>tone(659,.2,.2),150); setTimeout(()=>tone(784,.5,.2),300);
+      if(voiceOn) speak(say, {pitch:1.15, rate:1});
+    } else {
+      $('#checkOut').innerHTML = `<span class="bad">${msg}</span>`;
+      tone(220,.35,.25,'sawtooth'); setTimeout(()=>tone(160,.6,.25,'sawtooth'),300);
+      if(voiceOn) speak(pick(['Oh no! False alarm!','Nice try, but no!','Sorry, not this time. Back to your cards!']), {pitch:.95, rate:.95});
+    }
+  }
+
+  // ---------- confetti ----------
+  function confetti(){
+    const cv=$('#confetti'), c=cv.getContext('2d'); cv.width=innerWidth; cv.height=innerHeight;
+    const cols=[...COLORS75,'#fff7e8'];
+    const ps=Array.from({length:180},()=>({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,
+      vx:(Math.random()-.5)*4,vy:2+Math.random()*4,r:4+Math.random()*6,c:cols[rand(cols.length)],a:Math.random()*6}));
+    let f=0;
+    (function fr(){ c.clearRect(0,0,cv.width,cv.height);
+      ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.05;p.a+=.1;c.fillStyle=p.c;c.save();c.translate(p.x,p.y);c.rotate(p.a);c.fillRect(-p.r/2,-p.r/2,p.r,p.r*.6);c.restore();});
+      if(++f<220) requestAnimationFrame(fr); else c.clearRect(0,0,cv.width,cv.height);
+    })();
+  }
+
+  // ---------- wiring ----------
+  $('#nextBtn').onclick = () => { unlockAudio(); if(S.auto){ stopAuto(); } draw(); };
+  $('#autoBtn').onclick = () => { unlockAudio(); S.auto ? stopAuto() : startAuto(); };
+  $('#repeatBtn').onclick = () => { unlockAudio(); const l=S.called[S.called.length-1]; if(l){ const was=voiceOn; voiceOn=true; announce(l).then(()=>voiceOn=was);} };
+  $('#voiceToggle').onclick = () => { voiceOn=!voiceOn; if(voiceOn && S.voice===0) S.voice=1; updateVoiceBtn(); if(!voiceOn) try{speechSynthesis.cancel()}catch(e){} };
+  $('#fsBtn').onclick = async () => { try{ document.fullscreenElement ? await document.exitFullscreen() : await document.documentElement.requestFullscreen(); }catch(e){} };
+
+  const openBingo = () => { stopAuto(); $('#checkInput').value=''; $('#checkOut').innerHTML=''; $('#checkCard').innerHTML=''; $('#mBingo').classList.add('show'); tone(659,.15,.2); setTimeout(()=>tone(784,.25,.2),130); if(voiceOn){ try{speechSynthesis.cancel()}catch(e){} speak('Let\'s check that card!', {pitch:1.1, rate:1}); } setTimeout(()=>$('#checkInput').focus(),50); };
+  $('#bingoBtn').onclick = () => { unlockAudio(); openBingo(); };
+  $('#checkBtn').onclick = () => { unlockAudio(); stopAuto(); $('#checkInput').value=''; $('#checkOut').innerHTML=''; $('#checkCard').innerHTML=''; $('#mBingo').classList.add('show'); setTimeout(()=>$('#checkInput').focus(),50); };
+  $('#checkGo').onclick = checkCard;
+  $('#checkInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkCard(); });
+  $('#continueBtn').onclick = () => $('#mBingo').classList.remove('show');
+  $('#endBtn').onclick = () => { $('#mBingo').classList.remove('show'); $('#mNew').classList.add('show'); };
+
+  $('#newBtn').onclick = () => { stopAuto(); $('#mNew').classList.add('show'); };
+  $('#noNew').onclick = () => $('#mNew').classList.remove('show');
+  $('#yesNew').onclick = () => {
+    $('#mNew').classList.remove('show'); stopAuto();
+    try{ localStorage.removeItem('bingoState'); }catch(e){}
+    try{ speechSynthesis.cancel(); }catch(e){}
+    $('#game').style.display='none'; $('#setup').style.display='flex'; $('#resumeBtn').style.display='none';
+  };
+
+  document.addEventListener('keydown', e=>{
+    if($('#game').style.display!=='block') return;
+    if(document.activeElement && document.activeElement.tagName==='INPUT') return;
+    if(document.querySelector('.modal.show')) { if(e.key==='Escape') document.querySelectorAll('.modal').forEach(m=>m.classList.remove('show')); return; }
+    if(e.code==='Space'){ e.preventDefault(); $('#nextBtn').click(); }
+    else if(e.key==='a'||e.key==='A') $('#autoBtn').click();
+    else if(e.key==='r'||e.key==='R') $('#repeatBtn').click();
+    else if(e.key==='b'||e.key==='B') $('#bingoBtn').click();
+  });
+})();
+</script>
+</body>
+</html>
