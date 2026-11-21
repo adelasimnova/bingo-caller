@@ -448,6 +448,16 @@
         gap: 8px;
         margin-top: 18px;
       }
+      /* number field without the up/down arrows */
+      .check-in input::-webkit-outer-spin-button,
+      .check-in input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .check-in input[type="number"] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
       .check-in input {
         flex: 1;
         font: inherit;
@@ -896,8 +906,11 @@
         <div class="check-in">
           <input
             id="checkInput"
-            placeholder="Card number, e.g. 17"
+            type="number"
             inputmode="numeric"
+            pattern="[0-9]*"
+            min="1"
+            placeholder="Card number, e.g. 17"
           /><button class="tb" id="checkGo">Check</button>
         </div>
         <div class="mini" id="checkCard"></div>
