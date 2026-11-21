@@ -327,6 +327,23 @@
         ) !important;
         font-weight: 800;
       }
+      .controls > button {
+        flex: 1;
+      }
+      .controls .bingo-btn {
+        font-size: 18px;
+        padding: 20px;
+        min-width: 140px;
+      }
+      .sub .next {
+        flex: 2;
+        background: var(--mint);
+        color: #082a20;
+        font-size: 20px;
+        font-weight: 800;
+        padding: 14px;
+        min-width: 160px;
+      }
       .hint {
         margin-top: 12px;
         font-size: 13px;
@@ -675,6 +692,14 @@
         padding: 16px;
         border-radius: 18px;
       }
+      html.tv .controls .bingo-btn {
+        font-size: 30px;
+        padding: 22px;
+        border-radius: 20px;
+      }
+      html.tv .sub .next {
+        font-size: 30px;
+      }
       html.tv .hint {
         font-size: 18px;
       }
@@ -861,13 +886,12 @@
               All numbers have been drawn!
             </div>
             <div class="controls">
-              <button class="next" id="nextBtn">Next number</button>
               <button class="auto" id="autoBtn">▶ Auto</button>
+              <button class="bingo-btn" id="bingoBtn">🎉 LINE / BINGO</button>
             </div>
             <div class="sub">
+              <button class="next" id="nextBtn">Next number</button>
               <button id="repeatBtn">🔁 Repeat</button>
-              <button id="checkBtn">🔎 Check card</button>
-              <button class="bingo-btn" id="bingoBtn">🎉 LINE / BINGO</button>
             </div>
             <div class="hint">
               Space = next number · A = auto · R = repeat · B = line / bingo
@@ -1308,6 +1332,10 @@
             g.connect(ctx.destination);
             o.start();
             o.stop(ctx.currentTime + dur);
+            o.onended = () => {
+              o.disconnect();
+              g.disconnect();
+            };
           } catch (e) {}
         }
         // ---------- background music (generated live, 5 lounge tracks) ----------
@@ -1461,8 +1489,29 @@
             g.gain.linearRampToValueAtTime(peak, t + a);
             g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
           }
+          // Every node a note creates is collected here and disconnected once the
+          // note has finished. Without this, finished notes stay wired into the
+          // graph, pile up over a few minutes and choke all sound in the page.
+          let made = null,
+            madeEnd = 0;
+          function node(n) {
+            made.push(n);
+            return n;
+          }
+          function cleanup(nodes, end) {
+            setTimeout(
+              () =>
+                nodes.forEach((n) => {
+                  try {
+                    n.disconnect();
+                  } catch (e) {}
+                }),
+              Math.max(0, end - ctx.currentTime + 0.5) * 1000,
+            );
+          }
           function osc(type, f, t, stop, dest, detune) {
-            const o = ctx.createOscillator();
+            const o = node(ctx.createOscillator());
+            madeEnd = Math.max(madeEnd, stop);
             o.type = type;
             o.frequency.value = f;
             if (detune) o.detune.value = detune;
@@ -1472,9 +1521,11 @@
             return o;
           }
           function voice(inst, m, t, d, v) {
+            made = [];
+            madeEnd = t;
             const f = hz(m),
-              g = ctx.createGain(),
-              lp = ctx.createBiquadFilter();
+              g = node(ctx.createGain()),
+              lp = node(ctx.createBiquadFilter());
             lp.type = "lowpass";
             g.connect(lp);
             lp.connect(fx);
@@ -1482,7 +1533,7 @@
               lp.frequency.value = 2200;
               env(g, t, 0.006, 0.09 * v, d + 0.9);
               osc("sine", f, t, t + d + 1, g);
-              const g2 = ctx.createGain();
+              const g2 = node(ctx.createGain());
               g2.connect(g);
               env(g2, t, 0.003, 0.35, 0.25);
               osc("triangle", f * 2, t, t + 0.4, g2);
@@ -1490,11 +1541,11 @@
               lp.frequency.value = 3000;
               env(g, t, 0.004, 0.08 * v, d + 1.4);
               osc("sine", f, t, t + d + 1.5, g);
-              const g2 = ctx.createGain();
+              const g2 = node(ctx.createGain());
               g2.connect(g);
               env(g2, t, 0.002, 0.25, 0.15);
               osc("sine", f * 4, t, t + 0.25, g2);
-              const trem = ctx.createGain();
+              const trem = node(ctx.createGain());
               osc("sine", 4.6, t, t + d + 1.5, trem);
               trem.gain.value = 0.025 * v;
               trem.connect(g.gain);
@@ -1513,7 +1564,7 @@
               g.gain.setValueAtTime(0.06 * v, t + d * 0.8);
               g.gain.linearRampToValueAtTime(0.0001, t + d + 0.15);
               const o = osc("sine", f, t, t + d + 0.2, g);
-              const vib = ctx.createGain();
+              const vib = node(ctx.createGain());
               vib.gain.value = f * 0.006;
               vib.connect(o.frequency);
               osc("sine", 5.2, t, t + d + 0.2, vib);
@@ -1523,6 +1574,7 @@
               osc("sine", f, t, t + d + 0.4, g);
               osc("triangle", f, t, t + d + 0.4, g);
             }
+            cleanup(made, madeEnd);
           }
           function hat(t, v) {
             if (!noise) {
@@ -1543,6 +1595,7 @@
             env(g, t, 0.004, 0.03 * v, 0.09);
             s.start(t);
             s.stop(t + 0.2);
+            cleanup([s, bp, g], t + 0.2);
           }
           function leadNote(chord, t, d, strong) {
             const pcs = strong
@@ -2570,15 +2623,6 @@
         $("#bingoBtn").onclick = () => {
           unlockAudio();
           openBingo();
-        };
-        $("#checkBtn").onclick = () => {
-          unlockAudio();
-          stopAuto();
-          $("#checkInput").value = "";
-          $("#checkOut").innerHTML = "";
-          $("#checkCard").innerHTML = "";
-          $("#mBingo").classList.add("show");
-          setTimeout(() => $("#checkInput").focus(), 50);
         };
         $("#checkGo").onclick = checkCard;
         $("#checkInput").addEventListener("keydown", (e) => {

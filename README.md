@@ -11,7 +11,7 @@ A bingo number caller that runs in the browser. It is one HTML file with no buil
 - **Background music:** five original lounge tracks generated live in the browser. Each new game plays the next track, the music gets quieter while the voice speaks, and **🎵 Music** turns it on or off
 - **Auto draw** at fast, normal or slow speed, or draw numbers one at a time with **Next number**
 - **Board of called numbers** with colour-coded columns, plus a list of the latest numbers
-- **Card check:** use **Check card** to verify a player's numbers when someone calls LINE or BINGO
+- **Card check:** use **LINE / BINGO** to verify a player's numbers when someone calls LINE or BINGO
 - **TV layout:** on a wide landscape screen (a TV, or a laptop in fullscreen) the game fills the whole screen with large numbers you can read from across the room. It is laid out for 1920×1080 and scales up to 4K, and the mouse pointer hides after 3 seconds
 - **Repeat** the last number, switch to **Fullscreen**, or start a **New game**
 - **Resume:** the game state is saved in `localStorage`, so you can pick up an unfinished game after reloading the page
@@ -28,7 +28,7 @@ Voice calling works best in Chrome, Edge or Safari. The page uses English voices
 
 ## Printable cards
 
-[`tombola-karty-1-80.pdf`](tombola-karty-1-80.pdf) has the 80 tombola cards (1–90 mode) that the app knows, 4 per A4 page in black and white, plus two rules sheets (in Slovak) to hand out. Use **Check card** in the app with the number printed above each card.
+[`tombola-karty-1-80.pdf`](tombola-karty-1-80.pdf) has the 80 tombola cards (1–90 mode) that the app knows, 4 per A4 page in black and white, plus two rules sheets (in Slovak) to hand out. Use **LINE / BINGO** in the app with the number printed above each card.
 
 ### Generating cards
 
