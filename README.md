@@ -8,6 +8,7 @@ A bingo number caller that runs in the browser. It is one HTML file with no buil
 
 - **Two game modes:** 1–75 (5×5 cards with columns B I N G O) or 1–90 (tombola, 3 rows × 9)
 - **Voice calling** reads numbers aloud with the browser's speech synthesis, including classic bingo calls in the 1–90 mode (for example "Two fat ladies, eighty-eight!")
+- **Recorded voice:** the caller's lines are played from MP3 recordings in `audio/`, so the voice also works in smart-TV browsers that have no speech voice. Opened as a local file, the game falls back to the browser's own voice
 - **Background music:** five original lounge tracks generated live in the browser. Each new game plays the next track, the music gets quieter while the voice speaks, and **🎵 Music** turns it on or off
 - **Auto draw** at fast, normal or slow speed, or draw numbers one at a time with **Next number**
 - **Board of called numbers** with colour-coded columns, plus a list of the latest numbers
@@ -29,6 +30,14 @@ Voice calling works best in Chrome, Edge or Safari. The page uses English voices
 ## Printable cards
 
 [`tombola-karty-1-80.pdf`](tombola-karty-1-80.pdf) has the 80 tombola cards (1–90 mode) that the app knows, 4 per A4 page in black and white, plus two rules sheets (in Slovak) to hand out. Use **LINE / BINGO** in the app with the number printed above each card.
+
+### Recording the voice
+
+The recordings are made on macOS with the built-in "Daniel" voice and ffmpeg. The script reads every line from `index.html`, so run it again after changing a spoken line:
+
+```bash
+python3 tools/make_voice.py
+```
 
 ### Generating cards
 

@@ -1103,6 +1103,7 @@
           updateVoiceBtn();
           music.newGame();
           updateMusicBtn();
+          clips.load();
           $("#setup").style.display = "none";
           $("#game").style.display = "block";
           buildBoard();
@@ -1778,13 +1779,110 @@
             return null;
           }
         }
+        // ---------- recorded voice ----------
+        // TV browsers usually have no speech voice, so the caller's lines are
+        // played from MP3 recordings (audio/, made by tools/make_voice.py).
+        // The browser's own voice is only a fallback, e.g. when the page is
+        // opened as a local file, where the recordings can't be loaded.
+        const clips = (() => {
+          const buf = {};
+          let loading = null,
+            playing = [];
+          const slug = (t) =>
+            t
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "");
+          function load() {
+            if (loading || !ctx || location.protocol === "file:")
+              return loading;
+            loading = fetch("audio/manifest.json")
+              .then((r) => (r.ok ? r.json() : []))
+              .then((keys) =>
+                Promise.all(
+                  keys.map((k) =>
+                    fetch(`audio/${k}.mp3`)
+                      .then((r) => r.arrayBuffer())
+                      .then(
+                        (a) =>
+                          new Promise((ok, no) =>
+                            ctx.decodeAudioData(a, ok, no),
+                          ),
+                      )
+                      .then((b) => (buf[k] = b))
+                      .catch(() => {}),
+                  ),
+                ),
+              )
+              .catch(() => {});
+            return loading;
+          }
+          // text -> list of recordings to play one after another, or null
+          function parts(text) {
+            const k = slug(text);
+            if (buf[k]) return [k];
+            let m = /^I repeat, (.+)$/.exec(text);
+            if (m) {
+              const p = parts(m[1]);
+              return p && buf["i-repeat"] ? ["i-repeat", ...p] : null;
+            }
+            m = /^([BINGO]) for (.+), (\d+)$/.exec(text);
+            if (m) {
+              const a = slug(`${m[1]} for ${m[2]}`);
+              return buf[a] && buf[m[3]] ? [a, m[3]] : null;
+            }
+            return null;
+          }
+          function play(keys) {
+            return new Promise((done) => {
+              let t = ctx.currentTime + 0.05;
+              keys.forEach((k, i) => {
+                const s = ctx.createBufferSource();
+                s.buffer = buf[k];
+                s.connect(ctx.destination);
+                s.start(t);
+                t += buf[k].duration + 0.12;
+                playing.push(s);
+                s.onended = () => {
+                  s.disconnect();
+                  playing = playing.filter((x) => x !== s);
+                  if (i === keys.length - 1) done();
+                };
+              });
+            });
+          }
+          function stop() {
+            playing.forEach((s) => {
+              try {
+                s.stop();
+              } catch (e) {}
+            });
+          }
+          return {
+            load,
+            stop,
+            play,
+            async get(text) {
+              if (loading) await Promise.race([loading, sleep(4000)]);
+              return parts(text);
+            },
+          };
+        })();
+        // stop whatever the caller is saying
+        function hush() {
+          try {
+            speechSynthesis.cancel();
+          } catch (e) {}
+          clips.stop();
+        }
+
         function speak(text, en) {
           let opt = {};
           if (en && typeof en === "object") {
             opt = en;
             en = false;
           }
-          return new Promise((resolve) => {
+          return new Promise(async (resolve) => {
             let finished = false;
             const res = () => {
               if (finished) return;
@@ -1793,6 +1891,12 @@
               resolve();
             };
             music.duck(1);
+            const keys = await clips.get(text);
+            if (keys) {
+              clips.play(keys).then(res);
+              setTimeout(res, 15000);
+              return;
+            }
             try {
               const u = new SpeechSynthesisUtterance(text);
               const v = pickEnVoice();
@@ -1810,6 +1914,20 @@
           });
         }
         const pick = (arr) => arr[rand(arr.length)];
+        // Fixed lines the caller says. They are recorded to audio/ by
+        // tools/make_voice.py, together with SPECIAL, ANIMALS and 1–90.
+        // Keep the texts here identical to the ones passed to speak().
+        const RECORDED = [
+          "I repeat",
+          "Let's check that card!",
+          "Bingo! Full house! We have a winner!",
+          "Line! We have a winner! Let's keep playing.",
+          "Full house! We have a winner!",
+          "Bingo! We have a winner!",
+          "Oh no! False alarm!",
+          "Nice try, but no!",
+          "Sorry, not this time. Back to your cards!",
+        ];
         const SPECIAL = {
           1: "Kelly's eye, number one!",
           7: "Lucky seven!",
@@ -1832,7 +1950,7 @@
         async function announce(n) {
           if (!voiceOn || S.voice === 0) return;
           try {
-            speechSynthesis.cancel();
+            hush();
           } catch (e) {}
           const L = letterOf(n);
           const a = S.mode === 75 ? animalOf[n] : null;
@@ -2482,7 +2600,7 @@
             }
           }
           try {
-            speechSynthesis.cancel();
+            hush();
           } catch (e) {}
           if (ok) {
             $("#checkOut").innerHTML = `<span class="ok">${msg}</span>`;
@@ -2570,7 +2688,7 @@
           updateVoiceBtn();
           if (!voiceOn)
             try {
-              speechSynthesis.cancel();
+              hush();
             } catch (e) {}
         };
         $("#musicBtn").onclick = () => {
@@ -2596,7 +2714,7 @@
           setTimeout(() => tone(784, 0.25, 0.2), 130);
           if (voiceOn) {
             try {
-              speechSynthesis.cancel();
+              hush();
             } catch (e) {}
             speak("Let's check that card!", { pitch: 1.1, rate: 1 });
           }
@@ -2637,7 +2755,7 @@
             localStorage.removeItem("bingoState");
           } catch (e) {}
           try {
-            speechSynthesis.cancel();
+            hush();
           } catch (e) {}
           music.stop();
           $("#game").style.display = "none";
