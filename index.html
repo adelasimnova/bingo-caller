@@ -1096,17 +1096,6 @@
           });
         }
         const pick = (arr) => arr[rand(arr.length)];
-        const OUTROS = [
-          "Mark it!",
-          "Who's got it?",
-          "Eyes down!",
-          "Wake up, people!",
-          "Ooh, that hurts.",
-          "Lovely!",
-          "I wish I had that one.",
-          "Check your cards!",
-          "Somebody's smiling…",
-        ];
         const SPECIAL = {
           1: "Kelly's eye, number one!",
           7: "Lucky seven!",
@@ -1134,15 +1123,6 @@
           const L = letterOf(n);
           const a = S.mode === 75 ? animalOf[n] : null;
           const core = L && a ? `${L} for ${a[0]}, ${n}` : `${n}`;
-          const left = S.pool.length;
-          if (S.called.length === 1)
-            await speak("Eyes down, here we go! The first number is", {
-              pitch: 1.1,
-              rate: 1.02,
-            });
-          else if (left === 5)
-            await speak("Only five balls left in the drum!", { pitch: 1.1 });
-          await sleep(200);
           if (SPECIAL[n] && S.mode === 90)
             await speak(SPECIAL[n], { pitch: 1.1, rate: 0.95 });
           else await speak(core, { pitch: 1.05, rate: 0.9 });
