@@ -23,3 +23,21 @@ open index.html
 ```
 
 Voice calling works best in Chrome, Edge or Safari. The page uses English voices if the system has them installed.
+
+## Printable cards
+
+[`tombola-karty-1-80.pdf`](tombola-karty-1-80.pdf) has the 80 tombola cards (1–90 mode) that the app knows, 4 per A4 page in black and white, plus two rules sheets (in Slovak) to hand out. Use **Check card** in the app with the number printed above each card.
+
+### Generating cards
+
+The cards are stored in the `CARDS90` object in `index.html`, and the PDF is printed from that same data, so the app and the printed cards always match.
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r tools/requirements.txt
+
+.venv/bin/python tools/tombola.py pdf       # rebuild the PDF from index.html
+.venv/bin/python tools/tombola.py add 20    # add 20 new unique cards, then rebuild the PDF
+```
+
+Options: `--out FILE` sets the PDF path and `--rules N` sets how many rules sheets go at the end (default 2). On the first run the script downloads the DejaVu Sans font into `tools/fonts/`.
