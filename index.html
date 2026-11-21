@@ -280,16 +280,7 @@
         width: 100%;
         flex-wrap: wrap;
       }
-      .next {
-        flex: 2;
-        background: var(--mint);
-        color: #082a20;
-        font-size: 24px;
-        font-weight: 800;
-        padding: 20px;
-        min-width: 220px;
-      }
-      .next:disabled {
+      .sub button:disabled {
         opacity: 0.4;
         cursor: default;
       }
@@ -334,15 +325,6 @@
         font-size: 18px;
         padding: 20px;
         min-width: 140px;
-      }
-      .sub .next {
-        flex: 2;
-        background: var(--mint);
-        color: #082a20;
-        font-size: 20px;
-        font-weight: 800;
-        padding: 14px;
-        min-width: 160px;
       }
       .hint {
         margin-top: 12px;
@@ -673,11 +655,6 @@
         margin-top: 18px;
         gap: 14px;
       }
-      html.tv .next {
-        font-size: 38px;
-        padding: 22px;
-        border-radius: 20px;
-      }
       html.tv .auto {
         font-size: 30px;
         padding: 22px;
@@ -696,9 +673,6 @@
         font-size: 30px;
         padding: 22px;
         border-radius: 20px;
-      }
-      html.tv .sub .next {
-        font-size: 30px;
       }
       html.tv .hint {
         font-size: 18px;
@@ -890,7 +864,7 @@
               <button class="bingo-btn" id="bingoBtn">🎉 LINE / BINGO</button>
             </div>
             <div class="sub">
-              <button class="next" id="nextBtn">Next number</button>
+              <button id="nextBtn">Next number</button>
               <button id="repeatBtn">🔁 Repeat</button>
             </div>
             <div class="hint">
@@ -1291,7 +1265,7 @@
           if (S.pool.length === 0) return;
           S.auto = true;
           $("#autoBtn").classList.add("running");
-          $("#autoBtn").textContent = "⏸ Pauza";
+          $("#autoBtn").textContent = "⏸ Pause";
           loop();
         }
         async function loop() {
@@ -1478,10 +1452,8 @@
             duck = 0,
             noise = null;
           let on = true,
+            paused = false,
             current = -1;
-          try {
-            on = localStorage.getItem("bingoMusic") !== "off";
-          } catch (e) {}
           const LEVEL = 0.14; // soft background level
 
           function env(g, t, a, peak, d) {
@@ -1728,16 +1700,26 @@
               try {
                 localStorage.setItem("bingoLastTrack", current);
               } catch (e) {}
-              if (on) play();
+              on = true; // every game starts with music on
+              paused = false;
+              play();
             },
             toggle() {
               on = !on;
-              try {
-                localStorage.setItem("bingoMusic", on ? "on" : "off");
-              } catch (e) {}
-              on ? play() : stop();
+              if (!on) stop();
+              else if (!paused) play();
             },
             stop,
+            // silent while the LINE / BINGO window is open
+            pause() {
+              paused = true;
+              stop();
+            },
+            resume() {
+              if (!paused) return;
+              paused = false;
+              if (on && current >= 0) play();
+            },
             // quieter while the voice is speaking
             duck(d) {
               duck = Math.max(0, duck + d);
@@ -2629,6 +2611,15 @@
           if (e.key === "Enter") checkCard();
         });
         $("#continueBtn").onclick = () => $("#mBingo").classList.remove("show");
+        // music pauses while the LINE / BINGO window is open
+        new MutationObserver(() =>
+          $("#mBingo").classList.contains("show")
+            ? music.pause()
+            : music.resume(),
+        ).observe($("#mBingo"), {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
         $("#endBtn").onclick = () => {
           $("#mBingo").classList.remove("show");
           $("#mNew").classList.add("show");
